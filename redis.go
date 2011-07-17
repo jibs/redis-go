@@ -1412,6 +1412,11 @@ func (t *Transaction) Multi() os.Error {
 	return err
 }
 
+func (t *Transaction) Discard() os.Error {
+	_, err := t.sendCommand("DISCARD")
+	return err
+}
+
 func (t *Transaction) Exec() ([][]byte, os.Error) {
 	res, err := t.sendCommand("EXEC")
 	if err != nil {
