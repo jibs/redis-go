@@ -3,7 +3,6 @@ package redis
 import (
 	"bufio"
 	"bytes"
-	"container/vector"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1064,7 +1063,7 @@ func valueToString(v reflect.Value) (string, os.Error) {
 	return "", os.NewError("Unsupported type")
 }
 
-func containerToString(val reflect.Value, args *vector.StringVector) os.Error {
+func containerToString(val reflect.Value, args []string) os.Error {
 	switch v := val; v.Kind() {
 	case reflect.Ptr:
 		return containerToString(reflect.Indirect(v), args)
@@ -1075,36 +1074,36 @@ func containerToString(val reflect.Value, args *vector.StringVector) os.Error {
 			return os.NewError("Unsupported type - map key must be a string")
 		}
 		for _, k := range v.MapKeys() {
-			args.Push(k.String())
+			args = append(args, k.String())
 			s, err := valueToString(v.MapIndex(k))
 			if err != nil {
 				return err
 			}
-			args.Push(s)
+			args = append(args, s)
 		}
 	case reflect.Struct:
 		st := v.Type()
 		for i := 0; i < st.NumField(); i++ {
 			ft := st.FieldByIndex([]int{i})
-			args.Push(ft.Name)
+			args = append(args, ft.Name)
 			s, err := valueToString(v.FieldByIndex([]int{i}))
 			if err != nil {
 				return err
 			}
-			args.Push(s)
+			args = append(args, s)
 		}
 	}
 	return nil
 }
 
 func (client *Client) Hmset(key string, mapping interface{}) os.Error {
-	args := new(vector.StringVector)
-	args.Push(key)
+	args := make([]string, 1)
+	args[0] = key
 	err := containerToString(reflect.ValueOf(mapping), args)
 	if err != nil {
 		return err
 	}
-	_, err = client.sendCommand("HMSET", *args...)
+	_, err = client.sendCommand("HMSET", args...)
 	if err != nil {
 		return err
 	}
