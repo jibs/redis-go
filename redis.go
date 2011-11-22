@@ -669,8 +669,8 @@ func (client *Client) Lset(key string, index int, value []byte) os.Error {
 	return nil
 }
 
-func (client *Client) Lrem(key string, index int) (int, os.Error) {
-	res, err := client.sendCommand("LREM", key, strconv.Itoa(index))
+func (client *Client) Lrem(key string, count int, value []byte) (int, os.Error) {
+	res, err := client.sendCommand("LREM", key, strconv.Itoa(count), string(value))
 	if err != nil {
 		return -1, err
 	}
