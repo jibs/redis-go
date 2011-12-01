@@ -1062,7 +1062,7 @@ func valueToString(v reflect.Value) (string, error) {
 	return "", errors.New("Unsupported type")
 }
 
-func containerToString(val reflect.Value, args []string) error {
+func containerToString(val reflect.Value, args *[]string) error {
 	switch v := val; v.Kind() {
 	case reflect.Ptr:
 		return containerToString(reflect.Indirect(v), args)
@@ -1073,23 +1073,23 @@ func containerToString(val reflect.Value, args []string) error {
 			return errors.New("Unsupported type - map key must be a string")
 		}
 		for _, k := range v.MapKeys() {
-			args = append(args, k.String())
 			s, err := valueToString(v.MapIndex(k))
 			if err != nil {
 				return err
 			}
-			args = append(args, s)
+			*args = append(*args, k.String())
+			*args = append(*args, s)
 		}
 	case reflect.Struct:
 		st := v.Type()
 		for i := 0; i < st.NumField(); i++ {
 			ft := st.FieldByIndex([]int{i})
-			args = append(args, ft.Name)
 			s, err := valueToString(v.FieldByIndex([]int{i}))
 			if err != nil {
 				return err
 			}
-			args = append(args, s)
+			*args = append(*args, ft.Name)
+			*args = append(*args, s)
 		}
 	}
 	return nil
@@ -1098,7 +1098,7 @@ func containerToString(val reflect.Value, args []string) error {
 func (client *Client) Hmset(key string, mapping interface{}) error {
 	args := make([]string, 1)
 	args[0] = key
-	err := containerToString(reflect.ValueOf(mapping), args)
+	err := containerToString(reflect.ValueOf(mapping), &args)
 	if err != nil {
 		return err
 	}
