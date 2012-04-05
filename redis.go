@@ -8,10 +8,10 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 const (
@@ -111,7 +111,7 @@ func readResponse(reader *bufio.Reader) (interface{}, error) {
 	}
 
 	if line[0] == ':' {
-		n, err := strconv.Atoi64(strings.TrimSpace(line[1:]))
+		n, err := strconv.ParseInt(strings.TrimSpace(line[1:]), 10, 64)
 		if err != nil {
 			return nil, RedisError("Int reply is not a number")
 		}
@@ -195,7 +195,7 @@ func (client *Client) sendCommand(cmd string, args ...string) (data interface{},
 
 	b = commandBytes(cmd, args...)
 	data, err = client.rawSend(c, b)
-	if err == io.EOF || err == os.EPIPE {
+	if err == io.EOF || err == syscall.EPIPE {
 		c, err = client.openConnection()
 		if err != nil {
 			goto End
@@ -404,7 +404,7 @@ func (client *Client) Dbsize() (int, error) {
 }
 
 func (client *Client) Expire(key string, time int64) (bool, error) {
-	res, err := client.sendCommand("EXPIRE", key, strconv.Itoa64(time))
+	res, err := client.sendCommand("EXPIRE", key, strconv.FormatInt(time, 10))
 
 	if err != nil {
 		return false, err
@@ -502,7 +502,7 @@ func (client *Client) Setnx(key string, val []byte) (bool, error) {
 }
 
 func (client *Client) Setex(key string, time int64, val []byte) error {
-	_, err := client.sendCommand("SETEX", key, strconv.Itoa64(time), string(val))
+	_, err := client.sendCommand("SETEX", key, strconv.FormatInt(time, 10), string(val))
 
 	if err != nil {
 		return err
@@ -554,7 +554,7 @@ func (client *Client) Incr(key string) (int64, error) {
 }
 
 func (client *Client) Incrby(key string, val int64) (int64, error) {
-	res, err := client.sendCommand("INCRBY", key, strconv.Itoa64(val))
+	res, err := client.sendCommand("INCRBY", key, strconv.FormatInt(val, 10))
 	if err != nil {
 		return -1, err
 	}
@@ -572,7 +572,7 @@ func (client *Client) Decr(key string) (int64, error) {
 }
 
 func (client *Client) Decrby(key string, val int64) (int64, error) {
-	res, err := client.sendCommand("DECRBY", key, strconv.Itoa64(val))
+	res, err := client.sendCommand("DECRBY", key, strconv.FormatInt(val, 10))
 	if err != nil {
 		return -1, err
 	}
@@ -703,7 +703,7 @@ func (client *Client) Brpop(keys []string, timeoutSecs uint) (*string, []byte, e
 }
 
 func (client *Client) bpop(cmd string, keys []string, timeoutSecs uint) (*string, []byte, error) {
-	args := append(keys, strconv.Uitoa(timeoutSecs))
+	args := append(keys, strconv.FormatUint(uint64(timeoutSecs), 10))
 	res, err := client.sendCommand(cmd, args...)
 	if err != nil {
 		return nil, nil, err
@@ -880,7 +880,7 @@ func (client *Client) Srandmember(key string) ([]byte, error) {
 // sorted set commands
 
 func (client *Client) Zadd(key string, value []byte, score float64) (bool, error) {
-	res, err := client.sendCommand("ZADD", key, strconv.Ftoa64(score, 'f', -1), string(value))
+	res, err := client.sendCommand("ZADD", key, strconv.FormatFloat(score, 'f', -1, 64), string(value))
 	if err != nil {
 		return false, err
 	}
@@ -898,13 +898,13 @@ func (client *Client) Zrem(key string, value []byte) (bool, error) {
 }
 
 func (client *Client) Zincrby(key string, value []byte, score float64) (float64, error) {
-	res, err := client.sendCommand("ZINCRBY", key, strconv.Ftoa64(score, 'f', -1), string(value))
+	res, err := client.sendCommand("ZINCRBY", key, strconv.FormatFloat(score, 'f', -1, 64), string(value))
 	if err != nil {
 		return 0, err
 	}
 
 	data := string(res.([]byte))
-	f, _ := strconv.Atof64(data)
+	f, _ := strconv.ParseFloat(data, 64)
 	return f, nil
 }
 
@@ -945,7 +945,7 @@ func (client *Client) Zrevrange(key string, start int, end int) ([][]byte, error
 }
 
 func (client *Client) Zrangebyscore(key string, start float64, end float64) ([][]byte, error) {
-	res, err := client.sendCommand("ZRANGEBYSCORE", key, strconv.Ftoa64(start, 'f', -1), strconv.Ftoa64(end, 'f', -1))
+	res, err := client.sendCommand("ZRANGEBYSCORE", key, strconv.FormatFloat(start, 'f', -1, 64), strconv.FormatFloat(end, 'f', -1, 64))
 	if err != nil {
 		return nil, err
 	}
@@ -969,7 +969,7 @@ func (client *Client) Zscore(key string, member []byte) (float64, error) {
 	}
 
 	data := string(res.([]byte))
-	f, _ := strconv.Atof64(data)
+	f, _ := strconv.ParseFloat(data, 64)
 	return f, nil
 }
 
@@ -983,7 +983,7 @@ func (client *Client) Zremrangebyrank(key string, start int, end int) (int, erro
 }
 
 func (client *Client) Zremrangebyscore(key string, start float64, end float64) (int, error) {
-	res, err := client.sendCommand("ZREMRANGEBYSCORE", key, strconv.Ftoa64(start, 'f', -1), strconv.Ftoa64(end, 'f', -1))
+	res, err := client.sendCommand("ZREMRANGEBYSCORE", key, strconv.FormatFloat(start, 'f', -1, 64), strconv.FormatFloat(end, 'f', -1, 64))
 	if err != nil {
 		return -1, err
 	}
@@ -1034,14 +1034,14 @@ func valueToString(v reflect.Value) (string, error) {
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return strconv.Itoa64(v.Int()), nil
+		return strconv.FormatInt(v.Int(), 10), nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return strconv.Uitoa64(v.Uint()), nil
+		return strconv.FormatUint(v.Uint(), 10), nil
 	case reflect.UnsafePointer:
-		return strconv.Uitoa64(uint64(v.Pointer())), nil
+		return strconv.FormatUint(uint64(v.Pointer()), 10), nil
 
 	case reflect.Float32, reflect.Float64:
-		return strconv.Ftoa64(v.Float(), 'g', -1), nil
+		return strconv.FormatFloat(v.Float(), 'g', -1, 64), nil
 
 	case reflect.String:
 		return v.String(), nil
@@ -1110,7 +1110,7 @@ func (client *Client) Hmset(key string, mapping interface{}) error {
 }
 
 func (client *Client) Hincrby(key string, field string, val int64) (int64, error) {
-	res, err := client.sendCommand("HINCRBY", key, field, strconv.Itoa64(val))
+	res, err := client.sendCommand("HINCRBY", key, field, strconv.FormatInt(val, 10))
 	if err != nil {
 		return -1, err
 	}
@@ -1177,25 +1177,25 @@ func writeTo(data []byte, val reflect.Value) error {
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(data))
 	case reflect.Bool:
-		b, err := strconv.Atob(s)
+		b, err := strconv.ParseBool(s)
 		if err != nil {
 			return err
 		}
 		v.SetBool(b)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		i, err := strconv.Atoi64(s)
+		i, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
 			return err
 		}
 		v.SetInt(i)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		ui, err := strconv.Atoui64(s)
+		ui, err := strconv.ParseUint(s, 10, 64)
 		if err != nil {
 			return err
 		}
 		v.SetUint(ui)
 	case reflect.Float32, reflect.Float64:
-		f, err := strconv.Atof64(s)
+		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
 			return err
 		}
